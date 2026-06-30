@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Gym Tracker</title>
+    
+    <link rel="manifest" href="manifest.json">
+    
+    <meta name="theme-color" content="#e2e8f0" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#051329" media="(prefers-color-scheme: dark)">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* Entfernt den grauen Klick-Kasten auf iOS */
+        }
+
+        :root {
+            --bg-gradient: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+            --bg-secondary: rgba(255, 255, 255, 0.7);
+            --bg-tertiary: rgba(247, 250, 252, 0.8);
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --border-color: rgba(203, 213, 224, 0.5);
+            --accent-color: #3182ce;
+            --accent-hover: #2b6cb0;
+            --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+            --success-color: #38a169;
+            --danger-color: #e53e3e;
+            --warning-color: #dd6b20;
+            --backdrop-filter: blur(10px);
+            
+            --bronze-color: #cd7f32;
+            --silber-color: #c0c0c0;
+            --gold-color: #ffd700;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-gradient: linear-gradient(135deg, #000000 0%, #051329 100%);
+                --bg-secondary: rgba(15, 23, 42, 0.65);
+                --bg-tertiary: rgba(30, 41, 59, 0.5);
+                --text-primary: #f8fafc;
+                --text-secondary: #94a3b8;
+                --border-color: rgba(51, 65, 85, 0.4);
+                --accent-color: #38bdf8;
+                --accent-hover: #0ea5e9;
+                --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+                --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
+                --success-color: #4ade80;
+                --danger-color: #f87171;
+                --warning-color: #fb923c;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 15px;
+            /* FIX: Verhindert weiße Ränder an den Notch-Ausschnitten auf neuen iPhones */
+            padding-top: calc(15px + env(safe-area-inset-top));
+            padding-bottom: calc(15px + env(safe-area-inset-bottom));
+            color: var(--text-primary);
+            overflow-x: hidden; /* Verhindert das seitliche Wackeln/Scrollen komplett */
+            width: 100%;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            width: 100%;
+        }
+
+        .nav-header {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            font-size: 1.8em;
+            cursor: pointer;
+            color: var(--text-primary);
+            padding: 10px;
+            width: auto;
+            transition: transform 0.2s ease;
+        }
+
+        .hamburger-btn:hover { transform: scale(1.1); }
+
+        .sidebar {
+            position: fixed;
+            top: 0; right: -300px; width: 300px; height: 100%;
+            background: var(--bg-secondary);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            box-shadow: var(--shadow-md);
+            z-index: 1000;
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 30px 20px;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .sidebar.open { right: 0; }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .close-sidebar-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-primary); width: auto; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+
+        .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .2s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: #ffffff; transition: .2s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-color); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px 15px;
+            background: var(--bg-secondary);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        h1 { font-size: 2.1em; margin-bottom: 8px; color: var(--text-primary); font-weight: 700; letter-spacing: -0.5px; }
+        .subtitle { color: var(--text-secondary); font-size: 0.95em; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 25px; }
+        .stat-card {
+            background: var(--bg-secondary);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            padding: 16px; border-radius: 14px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);
+            transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; pointer-events: auto;
+        }
+        .stat-number { font-size: 1.6em; font-weight: 700; color: var(--text-primary); margin: 6px 0; letter-spacing: -0.5px; }
+        .streak-warning { font-size: 0.75em; color: var(--danger-color); font-weight: 600; margin-top: 4px; }
+        .stat-label { color: var(--text-secondary); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; }
+
+        .achievements-container {
+            background: var(--bg-secondary); backdrop-filter: var(--backdrop-filter); -webkit-backdrop-filter: var(--backdrop-filter);
+            padding: 20px; border-radius: 14px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); margin-bottom: 25px;
+        }
+        .achievements-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 15px; }
+        .achievement-card {
+            padding: 14px; background: var(--bg-tertiary); border-radius: 10px; border: 1px solid var(--border-color);
+            display: flex; align-items: center; gap: 12px; opacity: 0.35; filter: grayscale(100%); transition: all 0.3s ease; position: relative;
+        }
+        .achievement-card.unlocked { opacity: 1; filter: grayscale(0%); background: var(--bg-secondary); box-shadow: var(--shadow-sm); }
+        .achievement-card.unlocked.bronze { border-left: 4px solid var(--bronze-color); }
+        .achievement-card.unlocked.silber { border-left: 4px solid var(--silber-color); }
+        .achievement-card.unlocked.gold { border-left: 4px solid var(--gold-color); }
+        .achievement-card.unlocked.standard { border-left: 4px solid var(--success-color); }
+        .achievement-badge-tier { position: absolute; top: 6px; right: 8px; font-size: 0.65em; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .bronze .achievement-badge-tier { color: var(--bronze-color); }
+        .silber .achievement-badge-tier { color: var(--silber-color); }
+        .gold .achievement-badge-tier { color: var(--gold-color); }
+        .achievement-icon { font-size: 1.5em; }
+        .achievement-info h4 { font-size: 0.9em; color: var(--text-primary); font-weight: 600; }
+        .achievement-info p { font-size: 0.75em; color: var(--text-secondary); }
+
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; width: 100%; }
+        .card {
+            background: var(--bg-secondary); backdrop-filter: var(--backdrop-filter); -webkit-backdrop-filter: var(--backdrop-filter);
+            padding: 20px; border-radius: 14px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); width: 100%;
+        }
+        .card h2 { font-size: 1.25em; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        label { display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 600; font-size: 0.8em; }
+
+        input, select {
+            width: 100%; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-size: 0.95em; transition: all 0.2s ease; background: var(--bg-tertiary); color: var(--text-primary);
+        }
+        input:focus, select:focus { outline: none; border-color: var(--accent-color); background: var(--bg-secondary); }
+
+        button, .tab, .sub-tab {
+            cursor: pointer !important;
+            pointer-events: auto !important; /* Erzwingt Klickbarkeit unter iOS */
+        }
+
+        button {
+            width: 100%; padding: 13px; background: var(--accent-color); color: #ffffff; border: none; border-radius: 8px;
+            font-size: 0.95em; font-weight: 600; transition: all 0.2s ease;
+        }
+        button:hover { background: var(--accent-hover); }
+
+        .workout-list, .macro-list { max-height: 380px; overflow-y: auto; }
+        .workout-item, .macro-item {
+            background: var(--bg-tertiary); padding: 12px; margin-bottom: 10px; border-radius: 10px;
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-color);
+        }
+        .macro-item { border-left-color: var(--success-color); }
+        .workout-title { font-weight: 600; font-size: 0.95em; color: var(--text-primary); }
+        .workout-details { font-size: 0.8em; color: var(--text-secondary); margin-top: 2px; }
+
+        .item-actions { display: flex; gap: 4px; align-items: center; }
+
+        .action-btn {
+            background: transparent; border: 1px solid transparent; padding: 6px 8px; border-radius: 6px;
+            font-size: 0.85em; color: var(--text-secondary);
+        }
+        .action-btn.share { color: var(--accent-color); border-color: var(--accent-color); font-weight: 700; }
+        .action-btn.edit { color: var(--warning-color); }
+        .action-btn.delete { color: var(--danger-color); }
+
+        .inline-edit-box { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+        .inline-edit-box .input-row { display: flex; gap: 6px; }
+        .inline-edit-box input { padding: 6px 10px; font-size: 0.9em; }
+
+        .macro-progress-container { margin-bottom: 20px; background: var(--bg-tertiary); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color); }
+        .progress-label-group { display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 6px; font-weight: 600; }
+        .progress-bar-wrapper { background: var(--border-color); height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+        .progress-bar-wrapper:last-child { margin-bottom: 0; }
+        .progress-bar { height: 100%; background: var(--accent-color); width: 0%; transition: width 0.3s ease; }
+        .progress-bar.protein { background: var(--success-color); }
+
+        .sub-tabs { display: flex; gap: 5px; margin-bottom: 14px; background: rgba(0,0,0,0.05); padding: 4px; border-radius: 8px; }
+        .sub-tab { padding: 6px 10px; font-size: 0.75em; border: none; background: transparent; color: var(--text-secondary); border-radius: 6px; width: 33.3%; text-align: center; }
+        .sub-tab.active { background: var(--bg-secondary); color: var(--text-primary); box-shadow: var(--shadow-sm); font-weight: 600; }
+
+        .collapsible-link {
+            display: inline-block; font-size: 0.8em; font-weight: 700; color: var(--accent-color); cursor: pointer; margin-bottom: 12px;
+        }
+        
+        .plan-manager-panel {
+            background: var(--bg-tertiary); border: 1px dashed var(--border-color); padding: 12px; border-radius: 10px; margin-bottom: 15px; display: none;
+        }
+        .scrolling-checkbox-list {
+            max-height: 140px; overflow-y: auto; background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; margin-bottom: 12px;
+        }
+
+        .input-with-action { display: flex; gap: 6px; }
+        .input-with-action select { flex: 1; }
+        .input-with-action button { width: auto; padding: 11px 14px; }
+
+        .exercise-manager-panel {
+            background: var(--bg-tertiary); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; margin-top: 10px; display: none;
+        }
+        .exercise-list-item {
+            display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--border-color);
+        }
+
+        /* --- Responsive Charts Tabs & Silbentrennung --- */
+        .chart-container {
+            grid-column: 1 / -1; background: var(--bg-secondary); backdrop-filter: var(--backdrop-filter); -webkit-backdrop-filter: var(--backdrop-filter);
+            padding: 20px; border-radius: 14px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); width: 100%;
+            position: relative;
+        }
+        .chart-container h2 { font-size: 1.25em; font-weight: 700; margin-bottom: 15px; }
+        
+        .tabs { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); /* Nutzt ein flexibles Raster statt starrer Flexbox */
+            gap: 8px; 
+            margin-bottom: 20px; 
+            width: 100%;
+        }
+        .tab {
+            padding: 10px 6px; 
+            background: var(--bg-tertiary); 
+            border: 1px solid var(--border-color); 
+            border-radius: 6px;
+            font-size: 0.75em; 
+            font-weight: 600; 
+            color: var(--text-secondary); 
+            transition: all 0.2s;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 50px; /* Garantiert genug Raum für zweizeiligen Text */
+            
+            /* Automatische Worttrennung */
+            hyphens: auto;
+            -webkit-hyphens: auto; /* Safari-Support für iOS */
+            word-break: break-word;
+            line-height: 1.2;
+        }
+        .tab.active { background: var(--accent-color); color: #ffffff; border-color: var(--accent-color); }
+        .export-btn { background: transparent; border: 1px solid var(--success-color); color: var(--success-color); margin-top: 20px; }
+
+        canvas {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
+            z-index: 2000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background: var(--bg-secondary); backdrop-filter: var(--backdrop-filter); -webkit-backdrop-filter: var(--backdrop-filter);
+            border: 1px solid var(--border-color); padding: 20px; border-radius: 16px; width: 90%; max-width: 420px; box-shadow: var(--shadow-md);
+        }
+
+        @media (max-width: 768px) {
+            .main-content { grid-template-columns: 1fr; gap: 15px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            body { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-header">
+            <button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
+        </div>
+
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>⚙️ Einstellungen</h3>
+                <button class="close-sidebar-btn" onclick="toggleSidebar()">✕</button>
+            </div>
+            <div class="setting-item">
+                <span>🔥 Streaks & Badges</span>
+                <label class="switch">
+                    <input type="checkbox" id="feature-streak" checked onchange="toggleFeature('streak', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <span>🏆 Erfolge (Achievements)</span>
+                <label class="switch">
+                    <input type="checkbox" id="feature-achievements" checked onchange="toggleFeature('achievements', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <span>🥗 Kalorientracker</span>
+                <label class="switch">
+                    <input type="checkbox" id="feature-calories" checked onchange="toggleFeature('calories', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <header>
+            <h1>Gym Tracker</h1>
+            <p class="subtitle">Tracke deinen Fortschritt und erreiche deine Ziele</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Gesamt Workouts</div>
+                <div class="stat-number" id="totalWorkouts">0</div>
+            </div>
+            <div class="stat-card" id="card-streak">
+                <div class="stat-label">Aktuelle Streak</div>
+                <div class="stat-number" id="currentStreak">🔥 0 Tage</div>
+                <div class="streak-warning" id="streakWarning" style="display:none;">⚠️ Streak läuft heute ab!</div>
+            </div>
+            <div class="stat-card" id="card-maxstreak">
+                <div class="stat-label">Längste Streak</div>
+                <div class="stat-number" id="maxStreak">👑 0 Tage</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Gesamtvolumen</div>
+                <div class="stat-number" id="totalVolume">0 kg</div>
+            </div>
+        </div>
+
+        <div class="achievements-container" id="panel-achievements">
+            <h3>🏆 Deine Erfolge</h3>
+            <div class="achievements-grid">
+                <div class="achievement-card standard" id="ach-100kg">
+                    <div class="achievement-icon">💪</div>
+                    <div class="achievement-info">
+                        <h4>Meilenstein drücken</h4>
+                        <p>Erste 100kg beim Bankdrücken!</p>
+                    </div>
+                </div>
+                <div class="achievement-card standard" id="ach-10workouts">
+                    <div class="achievement-icon">🎉</div>
+                    <div class="achievement-info">
+                        <h4>Dranbleiber</h4>
+                        <p>10 Trainings abgeschlossen.</p>
+                    </div>
+                </div>
+                <div class="achievement-card" id="ach-vol-tier">
+                    <div class="achievement-icon" id="ach-vol-icon">🥉</div>
+                    <span class="achievement-badge-tier" id="ach-vol-badge">Bronze</span>
+                    <div class="achievement-info">
+                        <h4 id="ach-vol-title">Eisen-Anwärter</h4>
+                        <p id="ach-vol-desc">Sammle 5.000kg Wochenvolumen.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>📝 Neues Workout</h2>
+                
+                <span class="collapsible-link" onclick="togglePlanManager()">🛠️ Trainingspläne / Tage verwalten</span>
+                
+                <div class="plan-manager-panel" id="planManagerPanel">
+                    <div class="form-group">
+                        <label>Trainingstag wählen / editieren</label>
+                        <select id="selectPlanToEdit" onchange="loadPlanToEditor()">
+                            <option value="new">-- Neuen Tag erstellen --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Name des Trainingstags</label>
+                        <input type="text" id="newPlanName" placeholder="z.B. Push Day, Beine">
+                    </div>
+                    <label>Übungen für diesen Tag festlegen:</label>
+                    <div class="scrolling-checkbox-list" id="planExercisesChecklist"></div>
+                    <div class="form-inline">
+                        <button type="button" onclick="saveNewTrainingPlan()" style="background:var(--success-color);">💾 Speichern</button>
+                        <button type="button" id="btn-delete-plan" onclick="deleteTrainingPlan()" style="background:var(--danger-color); display:none;">🗑️ Plan löschen</button>
+                    </div>
+                </div>
+
+                <form id="workoutForm">
+                    <div class="form-group">
+                        <label>Trainingstag wählen (Filter)</label>
+                        <select id="filterPlanSelect" onchange="applyPlanFilterToExercises()">
+                            <option value="all">-- Alle Übungen anzeigen --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Übung</label>
+                        <div class="input-with-action">
+                            <select id="exerciseName"></select>
+                            <button type="button" onclick="toggleExerciseManagerPanel()" style="background: var(--accent-color); font-weight:bold;">➕ / ⚙️</button>
+                        </div>
+                        
+                        <div class="exercise-manager-panel" id="exerciseManagerPanel">
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label style="font-size:0.8em;">Neue Übung anlegen</label>
+                                <div class="input-with-action">
+                                    <input type="text" id="customExerciseInput" placeholder="z.B. Beinstrecker">
+                                    <button type="button" onclick="addCustomExercise()" style="background:var(--success-color); font-size:0.9em;">Erstellen</button>
+                                </div>
+                            </div>
+                            <label style="font-size:0.8em; margin-top:5px; display:block;">Deine erstellten Übungen:</label>
+                            <div id="customExercisesListContainer" style="max-height:110px; overflow-y:auto; background:var(--bg-secondary); padding:5px; border-radius:6px; border:1px solid var(--border-color);"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Gewicht (kg)</label>
+                        <input type="number" id="weight" placeholder="z.B. 80" step="0.5" required>
+                    </div>
+                    <div class="form-group form-inline">
+                        <div>
+                            <label>Wiederholungen</label>
+                            <input type="number" id="reps" placeholder="z.B. 10" required>
+                        </div>
+                        <div>
+                            <label>Sätze</label>
+                            <input type="number" id="sets" placeholder="z.B. 3" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Datum</label>
+                        <input type="date" id="workoutDate" required>
+                    </div>
+                    <button type="submit">➕ Workout hinzufügen</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>📋 Workout Historie</h2>
+                <div class="workout-list" id="workoutList"></div>
+            </div>
+        </div>
+
+        <div class="main-content" id="panel-calories" style="margin-top: 30px;">
+            <div class="card">
+                <h2>🥗 Kalorien & Protein Tracker</h2>
+                <div class="form-group form-inline">
+                    <div>
+                        <label>Ziel Kalorien (kcal)</label>
+                        <input type="number" id="targetKcal" value="2500" onchange="saveMacroGoals()">
+                    </div>
+                    <div>
+                        <label>Ziel Protein (g)</label>
+                        <input type="number" id="targetProtein" value="150" onchange="saveMacroGoals()">
+                    </div>
+                </div>
+
+                <div class="macro-progress-container">
+                    <div class="progress-label-group">
+                        <span>Kalorien</span>
+                        <span id="kcalProgressLabel">0 / 2500 kcal</span>
+                    </div>
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar" id="kcalBar"></div>
+                    </div>
+
+                    <div class="progress-label-group">
+                        <span>Protein</span>
+                        <span id="proteinProgressLabel">0 / 150 g</span>
+                    </div>
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar protein" id="proteinBar"></div>
+                    </div>
+                </div>
+
+                <form id="macroForm">
+                    <div class="sub-tabs">
+                        <button type="button" class="sub-tab active" id="btn-macro-direct" onclick="switchMacroInputMode('direct')">Direkte Eingabe</button>
+                        <button type="button" class="sub-tab" id="btn-macro-calc" onclick="switchMacroInputMode('calc')">Rechnen nach 100g</button>
+                        <button type="button" class="sub-tab" id="btn-macro-saved" onclick="switchMacroInputMode('saved')">Gespeichert</button>
+                    </div>
+
+                    <div class="form-group" id="wrapper-meal-name">
+                        <label>Mahlzeit / Lebensmittel</label>
+                        <input type="text" id="mealName" placeholder="z.B. Hähnchen mit Reis">
+                    </div>
+
+                    <div class="form-group" id="wrapper-saved-select" style="display: none;">
+                        <label>Favorit wählen / bearbeiten</label>
+                        <div class="input-with-action">
+                            <select id="savedMealsSelect" onchange="selectSavedMeal()"></select>
+                            <button type="button" id="btn-edit-fav" onclick="enableFavoritEditing()" style="background: var(--warning-color); display:none;">✏️</button>
+                            <button type="button" id="btn-delete-fav" onclick="deleteFavoritTemplate()" style="background: var(--danger-color); display:none;">🗑️</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group form-inline" id="wrapper-direct-inputs">
+                        <div>
+                            <label>Kalorien (kcal)</label>
+                            <input type="number" id="mealKcal" placeholder="z.B. 650">
+                        </div>
+                        <div>
+                            <label>Protein (g)</label>
+                            <input type="number" id="mealProtein" placeholder="z.B. 45">
+                        </div>
+                    </div>
+
+                    <div class="form-group form-inline" id="wrapper-calc-inputs" style="display: none;">
+                        <div>
+                            <label>Kalorien / 100g (kcal)</label>
+                            <input type="number" id="kcalPer100g" placeholder="z.B. 350" oninput="runLiveMacroCalculation()">
+                        </div>
+                        <div>
+                            <label>Protein / 100g (g)</label>
+                            <input type="number" id="proteinPer100g" placeholder="z.B. 22" oninput="runLiveMacroCalculation()">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" id="wrapper-portion-input" style="display: none;">
+                        <label>Gegessene Menge (g)</label>
+                        <input type="number" id="portionWeight" placeholder="z.B. 200" oninput="runLiveMacroCalculation()">
+                    </div>
+                    
+                    <div class="form-group" id="live-calc-preview" style="display: none; font-size: 0.85em; font-weight: 700; color: var(--success-color); margin-top: -10px; margin-bottom: 15px;">
+                        Berechnet: 0 kcal | 0g Protein
+                    </div>
+
+                    <div class="form-group" id="wrapper-save-checkbox" style="margin-bottom: 20px;">
+                        <label class="checkbox-label" style="font-size: 0.85em;">
+                            <input type="checkbox" id="saveMealTemplate"> Als Favorit für die Zukunft speichern
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Datum</label>
+                        <input type="date" id="macroDate" required>
+                    </div>
+                    <button type="submit" id="btn-submit-macro" style="background: var(--success-color);">🍏 Mahlzeit eintragen</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>🍏 Heutige Mahlzeiten</h2>
+                <div class="macro-list" id="macroList"></div>
+            </div>
+        </div>
+
+        <div class="chart-container" style="margin-top: 30px;">
+            <h2>📊 Fortschritts-Analysen</h2>
+            <div class="tabs">
+                <button class="tab active" onclick="switchChart('weight')">Gewichtsentwicklung</button>
+                <button class="tab" onclick="switchChart('frequency')">Häufigkeit</button>
+                <button class="tab" id="tab-correlation" onclick="switchChart('correlation')">Ernährung & Leistung</button>
+            </div>
+            <canvas id="progressChart"></canvas>
+            <button class="export-btn" onclick="openExportModal()">📥 Daten als CSV exportieren</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal-card">
+            <h3>📥 CSV Export konfigurieren</h3>
+            <p>Wähle aus, welche Spalten in den Datenexport inkludiert werden sollen:</p>
+            <div class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox" id="col-date" checked> Datum</label>
+                <label class="checkbox-label"><input type="checkbox" id="col-exercise" checked> Übung</label>
+                <label class="checkbox-label"><input type="checkbox" id="col-weight" checked> Gewicht (kg)</label>
+                <label class="checkbox-label"><input type="checkbox" id="col-reps" checked> Wiederholungen</label>
+                <label class="checkbox-label"><input type="checkbox" id="col-sets" checked> Sätze</label>
+                <label class="checkbox-label"><input type="checkbox" id="col-volume" checked> Volumen (kg)</label>
+            </div>
+            <div class="modal-actions">
+                <button onclick="closeExportModal()" style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color);">Abbrechen</button>
+                <button onclick="processCSVExport()" style="background: var(--success-color);">Exportieren</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="print-share-area"></div>
+
+    <script>
+        let workouts = JSON.parse(localStorage.getItem('gymWorkouts')) || [];
+        let meals = JSON.parse(localStorage.getItem('gymMeals')) || [];
+        let savedMealTemplates = JSON.parse(localStorage.getItem('gymSavedMealTemplates')) || [];
+        let trainingPlans = JSON.parse(localStorage.getItem('gymTrainingPlans')) || [];
+        let customExercises = JSON.parse(localStorage.getItem('gymCustomExercises')) || [];
+        let config = JSON.parse(localStorage.getItem('gymConfig')) || { streak: true, achievements: true, calories: true };
+        let macroGoals = JSON.parse(localStorage.getItem('gymMacroGoals')) || { kcal: 2500, protein: 150 };
+        
+        let currentChart = null;
+        let currentChartType = 'weight';
+        let currentMacroMode = 'direct'; 
+        let editFavIdx = null; 
+
+        const defaultExercises = ["Bankdrücken", "Kniebeugen", "Kreuzheben", "Schulterdrücken", "Klimmzüge", "Bizeps Curls", "Trizeps Dips", "Beinpresse", "Rudern"];
+        
+        function getAllExercises() { return [...defaultExercises, ...customExercises]; }
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('workoutDate').value = todayStr;
+        document.getElementById('macroDate').value = todayStr;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            for (let feature in config) {
+                const el = document.getElementById(`feature-${feature}`);
+                if (el) el.checked = config[feature];
+            }
+            document.getElementById('targetKcal').value = macroGoals.kcal;
+            document.getElementById('targetProtein').value = macroGoals.protein;
+            applyFeatureVisibility();
+            refreshExerciseDropdowns();
+            populateSavedMealsDropdown();
+            buildPlanManagerChecklist();
+            populatePlanDropdowns();
+            renderCustomExerciseManagerList();
+            updateUI();
+        });
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+        function toggleFeature(feature, isEnabled) {
+            config[feature] = isEnabled;
+            localStorage.setItem('gymConfig', JSON.stringify(config));
+            applyFeatureVisibility();
+            updateChart();
+        }
+
+        function applyFeatureVisibility() {
+            document.getElementById('card-streak').style.display = config.streak ? 'block' : 'none';
+            document.getElementById('card-maxstreak').style.display = config.streak ? 'block' : 'none';
+            document.getElementById('panel-achievements').style.display = config.achievements ? 'block' : 'none';
+            document.getElementById('panel-calories').style.display = config.calories ? 'block' : 'none';
+            document.getElementById('tab-correlation').style.display = config.calories ? 'block' : 'none';
+        }
+
+        function saveMacroGoals() {
+            macroGoals.kcal = parseInt(document.getElementById('targetKcal').value) || 2500;
+            macroGoals.protein = parseInt(document.getElementById('targetProtein').value) || 150;
+            localStorage.setItem('gymMacroGoals', JSON.stringify(macroGoals));
+            updateMacrosUI();
+        }
+
+        function refreshExerciseDropdowns() {
+            const exerciseSelect = document.getElementById('exerciseName');
+            const currentFilter = document.getElementById('filterPlanSelect').value;
+            if (currentFilter === 'all') {
+                exerciseSelect.innerHTML = getAllExercises().map(ex => `<option value="${ex}">${ex}</option>`).join('');
+            }
+        }
+
+        function toggleExerciseManagerPanel() {
+            const panel = document.getElementById('exerciseManagerPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function addCustomExercise() {
+            const input = document.getElementById('customExerciseInput');
+            const name = input.value.trim();
+            if (!name) return;
+
+            if (!getAllExercises().includes(name)) {
+                customExercises.push(name);
+                localStorage.setItem('gymCustomExercises', JSON.stringify(customExercises));
+                input.value = '';
+                
+                refreshExerciseDropdowns();
+                buildPlanManagerChecklist();
+                applyPlanFilterToExercises();
+                renderCustomExerciseManagerList();
+            } else {
+                alert("Diese Übung existiert bereits.");
+            }
+        }
+
+        function renameCustomExercise(idx) {
+            const oldName = customExercises[idx];
+            const newName = prompt(`Übung "${oldName}" umbenennen in:`, oldName);
+            if (!newName || !newName.trim() || newName.trim() === oldName) return;
+            
+            const cleanNewName = newName.trim();
+            if (getAllExercises().includes(cleanNewName)) {
+                alert("Eine Übung mit diesem Namen existiert bereits.");
+                return;
+            }
+
+            customExercises[idx] = cleanNewName;
+            localStorage.setItem('gymCustomExercises', JSON.stringify(customExercises));
+
+            workouts.forEach(w => { if (w.exercise === oldName) w.exercise = cleanNewName; });
+            localStorage.setItem('gymWorkouts', JSON.stringify(workouts));
+
+            trainingPlans.forEach(plan => {
+                const pIdx = plan.exercises.indexOf(oldName);
+                if (pIdx > -1) plan.exercises[pIdx] = cleanNewName;
+            });
+            localStorage.setItem('gymTrainingPlans', JSON.stringify(trainingPlans));
+
+            refreshExerciseDropdowns();
+            buildPlanManagerChecklist();
+            applyPlanFilterToExercises();
+            renderCustomExerciseManagerList();
+            updateUI();
+        }
+
+        function deleteCustomExercise(idx) {
+            const nameToDelete = customExercises[idx];
+            if (confirm(`Möchtest du die Übung "${nameToDelete}" wirklich löschen? Sie wird auch aus allen Trainingsplänen entfernt.`)) {
+                customExercises.splice(idx, 1);
+                localStorage.setItem('gymCustomExercises', JSON.stringify(customExercises));
+
+                trainingPlans.forEach(plan => {
+                    plan.exercises = plan.exercises.filter(ex => ex !== nameToDelete);
+                });
+                localStorage.setItem('gymTrainingPlans', JSON.stringify(trainingPlans));
+
+                refreshExerciseDropdowns();
+                buildPlanManagerChecklist();
+                applyPlanFilterToExercises();
+                renderCustomExerciseManagerList();
+                updateUI();
+            }
+        }
+
+        function renderCustomExerciseManagerList() {
+            const container = document.getElementById('customExercisesListContainer');
+            if (customExercises.length === 0) {
+                container.innerHTML = '<div style="font-size:0.8em; color:var(--text-secondary); text-align:center; padding:10px;">Noch keine eigenen Übungen angelegt.</div>';
+                return;
+            }
+            container.innerHTML = customExercises.map((ex, idx) => `
+                <div class="exercise-list-item">
+                    <span style="font-size:0.9em; font-weight:600;">${ex}</span>
+                    <div style="display:flex; gap:4px;">
+                        <button type="button" class="action-btn edit" onclick="renameCustomExercise(${idx})" style="padding:2px 6px;">✏️</button>
+                        <button type="button" class="action-btn delete" onclick="deleteCustomExercise(${idx})" style="padding:2px 6px;">🗑️</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function togglePlanManager() {
+            const panel = document.getElementById('planManagerPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function buildPlanManagerChecklist() {
+            const container = document.getElementById('planExercisesChecklist');
+            container.innerHTML = getAllExercises().map(ex => `
+                <label class="checkbox-label" style="font-size:0.85em; margin-bottom:6px;">
+                    <input type="checkbox" class="plan-checkbox" value="${ex}"> ${ex}
+                </label>
+            `).join('');
+        }
+
+        function populatePlanDropdowns() {
+            const filterSel = document.getElementById('filterPlanSelect');
+            const editSel = document.getElementById('selectPlanToEdit');
+            const optionsHTML = trainingPlans.map((p, idx) => `<option value="${idx}">${p.name}</option>`).join('');
+            
+            filterSel.innerHTML = '<option value="all">-- Alle Übungen anzeigen --</option>' + optionsHTML;
+            editSel.innerHTML = '<option value="new">-- Neuen Tag erstellen --</option>' + optionsHTML;
+        }
+
+        function loadPlanToEditor() {
+            const val = document.getElementById('selectPlanToEdit').value;
+            const btnDel = document.getElementById('btn-delete-plan');
+            const nameInput = document.getElementById('newPlanName');
+            const checkboxes = document.querySelectorAll('.plan-checkbox');
+            
+            checkboxes.forEach(cb => cb.checked = false);
+
+            if (val === 'new') {
+                nameInput.value = '';
+                btnDel.style.display = 'none';
+            } else {
+                const plan = trainingPlans[val];
+                nameInput.value = plan.name;
+                btnDel.style.display = 'block';
+                checkboxes.forEach(cb => {
+                    if (plan.exercises.includes(cb.value)) cb.checked = true;
+                });
+            }
+        }
+
+        function saveNewTrainingPlan() {
+            const name = document.getElementById('newPlanName').value.trim();
+            if (!name) { alert("Bitte gib einen Namen ein."); return; }
+
+            const checkboxes = document.querySelectorAll('.plan-checkbox:checked');
+            const selectedExercises = Array.from(checkboxes).map(cb => cb.value);
+
+            const val = document.getElementById('selectPlanToEdit').value;
+            if (val === 'new') {
+                trainingPlans.push({ name: name, exercises: selectedExercises });
+            } else {
+                trainingPlans[val] = { name: name, exercises: selectedExercises };
+            }
+
+            localStorage.setItem('gymTrainingPlans', JSON.stringify(trainingPlans));
+            document.getElementById('newPlanName').value = '';
+            document.querySelectorAll('.plan-checkbox').forEach(cb => cb.checked = false);
+            document.getElementById('selectPlanToEdit').value = 'new';
+            
+            togglePlanManager();
+            populatePlanDropdowns();
+            applyPlanFilterToExercises();
+            updateUI();
+        }
+
+        function deleteTrainingPlan() {
+            const val = document.getElementById('selectPlanToEdit').value;
+            if (val !== 'new' && confirm("Diesen Trainingstag unwiderruflich löschen?")) {
+                trainingPlans.splice(val, 1);
+                localStorage.setItem('gymTrainingPlans', JSON.stringify(trainingPlans));
+                document.getElementById('newPlanName').value = '';
+                document.getElementById('selectPlanToEdit').value = 'new';
+                togglePlanManager();
+                populatePlanDropdowns();
+                applyPlanFilterToExercises();
+            }
+        }
+
+        function applyPlanFilterToExercises() {
+            const val = document.getElementById('filterPlanSelect').value;
+            const exerciseSelect = document.getElementById('exerciseName');
+
+            if (val === 'all') {
+                exerciseSelect.innerHTML = getAllExercises().map(ex => `<option value="${ex}">${ex}</option>`).join('');
+            } else {
+                const plan = trainingPlans[val];
+                if (plan) {
+                    exerciseSelect.innerHTML = plan.exercises.map(ex => `<option value="${ex}">${ex}</option>`).join('');
+                }
+            }
+        }
+
+        function populateSavedMealsDropdown() {
+            const select = document.getElementById('savedMealsSelect');
+            if (savedMealTemplates.length === 0) {
+                select.innerHTML = '<option value="">Keine Favoriten gespeichert</option>';
+                document.getElementById('btn-edit-fav').style.display = 'none';
+                document.getElementById('btn-delete-fav').style.display = 'none';
+                return;
+            }
+            select.innerHTML = '<option value="">-- Favorit auswählen --</option>' + 
+                savedMealTemplates.map((m, idx) => `<option value="${idx}">${m.name} (${m.kcal} kcal, ${m.protein}g P / 100g)</option>`).join('');
+        }
+
+        function selectSavedMeal() {
+            const idx = document.getElementById('savedMealsSelect').value;
+            const visible = (idx !== "");
+            document.getElementById('btn-edit-fav').style.display = visible ? 'block' : 'none';
+            document.getElementById('btn-delete-fav').style.display = visible ? 'block' : 'none';
+            runLiveMacroCalculation();
+        }
+
+        function enableFavoritEditing() {
+            const idx = document.getElementById('savedMealsSelect').value; if (idx === "") return;
+            const fav = savedMealTemplates[idx]; editFavIdx = idx;
+            switchMacroInputMode('calc');
+            document.getElementById('mealName').value = fav.name; document.getElementById('kcalPer100g').value = fav.kcal; document.getElementById('proteinPer100g').value = fav.protein;
+            document.getElementById('btn-submit-macro').textContent = '💾 Favorit-Stammdaten aktualisieren';
+        }
+
+        function deleteFavoritTemplate() {
+            const idx = document.getElementById('savedMealsSelect').value;
+            if (idx !== "" && confirm("Diesen Favoriten dauerhaft aus der Liste löschen?")) {
+                savedMealTemplates.splice(idx, 1); localStorage.setItem('gymSavedMealTemplates', JSON.stringify(savedMealTemplates));
+                populateSavedMealsDropdown(); switchMacroInputMode('direct');
+            }
+        }
+
+        function switchMacroInputMode(mode) {
+            currentMacroMode = mode; editFavIdx = null; document.getElementById('btn-submit-macro').textContent = '🍏 Mahlzeit eintragen';
+            document.getElementById('btn-macro-direct').classList.toggle('active', mode === 'direct'); document.getElementById('btn-macro-calc').classList.toggle('active', mode === 'calc'); document.getElementById('btn-macro-saved').classList.toggle('active', mode === 'saved');
+            document.getElementById('wrapper-meal-name').style.display = (mode === 'direct' || mode === 'calc') ? 'block' : 'none'; document.getElementById('wrapper-saved-select').style.display = (mode === 'saved') ? 'block' : 'none';
+            document.getElementById('wrapper-direct-inputs').style.display = (mode === 'direct') ? 'grid' : 'none'; document.getElementById('wrapper-calc-inputs').style.display = (mode === 'calc') ? 'grid' : 'none';
+            document.getElementById('wrapper-portion-input').style.display = (mode === 'calc' || mode === 'saved') ? 'block' : 'none'; document.getElementById('live-calc-preview').style.display = (mode === 'calc' || mode === 'saved') ? 'block' : 'none'; document.getElementById('wrapper-save-checkbox').style.display = (mode !== 'saved') ? 'block' : 'none';
+            document.getElementById('mealName').required = (mode === 'direct' || mode === 'calc'); document.getElementById('mealKcal').required = (mode === 'direct'); document.getElementById('mealProtein').required = (mode === 'direct'); document.getElementById('kcalPer100g').required = (mode === 'calc'); document.getElementById('proteinPer100g').required = (mode === 'calc'); document.getElementById('portionWeight').required = (mode === 'calc' || mode === 'saved');
+            if (mode === 'saved') selectSavedMeal(); runLiveMacroCalculation();
+        }
+
+        function runLiveMacroCalculation() {
+            let kcalPer100 = 0; let proteinPer100 = 0; const weight = parseFloat(document.getElementById('portionWeight').value) || 0;
+            if (currentMacroMode === 'calc') { kcalPer100 = parseFloat(document.getElementById('kcalPer100g').value) || 0; proteinPer100 = parseFloat(document.getElementById('proteinPer100g').value) || 0; }
+            else if (currentMacroMode === 'saved') { const idx = document.getElementById('savedMealsSelect').value; if (idx !== "" && savedMealTemplates[idx]) { kcalPer100 = savedMealTemplates[idx].kcal; proteinPer100 = savedMealTemplates[idx].protein; } }
+            const computedKcal = Math.round((kcalPer100 * weight) / 100); const computedProtein = Math.round((proteinPer100 * weight) / 100);
+            document.getElementById('live-calc-preview').textContent = `🍏 Berechnet: ${computedKcal} kcal | 🧬 ${computedProtein}g Protein`; return { kcal: computedKcal, protein: computedProtein };
+        }
+
+        document.getElementById('workoutForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const workout = { id: Date.now(), exercise: document.getElementById('exerciseName').value, weight: parseFloat(document.getElementById('weight').value), reps: parseInt(document.getElementById('reps').value), sets: parseInt(document.getElementById('sets').value), date: document.getElementById('workoutDate').value, volume: parseFloat(document.getElementById('weight').value) * parseInt(document.getElementById('reps').value) * parseInt(document.getElementById('sets').value) };
+            workouts.push(workout); localStorage.setItem('gymWorkouts', JSON.stringify(workouts)); updateUI();
+            document.getElementById('weight').value = ''; document.getElementById('reps').value = ''; document.getElementById('sets').value = '';
+        });
+
+        document.getElementById('macroForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (editFavIdx !== null) {
+                savedMealTemplates[editFavIdx] = { name: document.getElementById('mealName').value.trim(), kcal: parseFloat(document.getElementById('kcalPer100g').value) || 0, protein: parseFloat(document.getElementById('proteinPer100g').value) || 0 };
+                localStorage.setItem('gymSavedMealTemplates', JSON.stringify(savedMealTemplates)); alert("Favorit erfolgreich aktualisiert!"); switchMacroInputMode('saved'); populateSavedMealsDropdown(); return;
+            }
+            let mealName = ""; let finalKcal = 0; let finalProtein = 0;
+            if (currentMacroMode === 'direct') {
+                mealName = document.getElementById('mealName').value; finalKcal = parseInt(document.getElementById('mealKcal').value); finalProtein = parseInt(document.getElementById('mealProtein').value);
+                if (document.getElementById('saveMealTemplate').checked) { savedMealTemplates.push({ name: mealName, kcal: Math.round((finalKcal / 100) * 100), protein: Math.round((finalProtein / 100) * 100) }); }
+            } else if (currentMacroMode === 'calc') {
+                mealName = document.getElementById('mealName').value; const calc = runLiveMacroCalculation(); finalKcal = calc.kcal; finalProtein = calc.protein;
+                if (document.getElementById('saveMealTemplate').checked) { savedMealTemplates.push({ name: mealName, kcal: parseFloat(document.getElementById('kcalPer100g').value) || 0, protein: parseFloat(document.getElementById('proteinPer100g').value) || 0 }); }
+            } else if (currentMacroMode === 'saved') {
+                const idx = document.getElementById('savedMealsSelect').value; if (idx === "") { alert("Bitte wähle eine gespeicherte Mahlzeit aus."); return; }
+                mealName = savedMealTemplates[idx].name; const calc = runLiveMacroCalculation(); finalKcal = calc.kcal; finalProtein = calc.protein;
+            }
+            const meal = { id: Date.now(), name: mealName, kcal: finalKcal, protein: finalProtein, date: document.getElementById('macroDate').value };
+            meals.push(meal); localStorage.setItem('gymMeals', JSON.stringify(meals)); localStorage.setItem('gymSavedMealTemplates', JSON.stringify(savedMealTemplates));
+            document.getElementById('mealName').value = ''; document.getElementById('mealKcal').value = ''; document.getElementById('mealProtein').value = ''; document.getElementById('kcalPer100g').value = ''; document.getElementById('proteinPer100g').value = ''; document.getElementById('portionWeight').value = ''; document.getElementById('saveMealTemplate').checked = false;
+            populateSavedMealsDropdown(); switchMacroInputMode(currentMacroMode); updateUI();
+        });
+
+        function enableInlineEditWorkout(id) {
+            const item = workouts.find(w => w.id === id); const container = document.getElementById(`workout-item-${id}`);
+            container.innerHTML = `
+                <div class="inline-edit-box">
+                    <div class="workout-title">✏️ ${item.exercise} editieren</div>
+                    <div class="input-row">
+                        <input type="number" id="edit-w-weight-${id}" value="${item.weight}" step="0.5" style="width:70px;">
+                        <input type="number" id="edit-w-reps-${id}" value="${item.reps}" style="width:60px;">
+                        <input type="number" id="edit-w-sets-${id}" value="${item.sets}" style="width:60px;">
+                    </div>
+                    <div class="item-actions" style="margin-top: 5px; justify-content: flex-end;">
+                        <button class="action-btn" onclick="updateUI()">Abbrechen</button>
+                        <button class="action-btn" onclick="saveInlineEditWorkout(${id})" style="color:var(--success-color); font-weight:700;">✅ Sichern</button>
+                    </div>
+                </div>`;
+        }
+
+        function saveInlineEditWorkout(id) {
+            const idx = workouts.findIndex(w => w.id === id); const newWeight = parseFloat(document.getElementById(`edit-w-weight-${id}`).value) || 0; const newReps = parseInt(document.getElementById(`edit-w-reps-${id}`).value) || 0; const newSets = parseInt(document.getElementById(`edit-w-sets-${id}`).value) || 0;
+            workouts[idx].weight = newWeight; workouts[idx].reps = newReps; workouts[idx].sets = newSets; workouts[idx].volume = newWeight * newReps * newSets;
+            localStorage.setItem('gymWorkouts', JSON.stringify(workouts)); updateUI();
+        }
+
+        function enableInlineEditMeal(id) {
+            const item = meals.find(m => m.id === id); const container = document.getElementById(`macro-item-${id}`);
+            container.innerHTML = `
+                <div class="inline-edit-box">
+                    <div class="workout-title">✏️ ${item.name} editieren</div>
+                    <div class="input-row">
+                        <input type="number" id="edit-m-kcal-${id}" value="${item.kcal}" style="width:90px;">
+                        <input type="number" id="edit-m-prot-${id}" value="${item.protein}" style="width:90px;">
+                    </div>
+                    <div class="item-actions" style="margin-top: 5px; justify-content: flex-end;">
+                        <button class="action-btn" onclick="updateUI()">Abbrechen</button>
+                        <button class="action-btn" onclick="saveInlineEditMeal(${id})" style="color:var(--success-color); font-weight:700;">✅ Sichern</button>
+                    </div>
+                </div>`;
+        }
+
+        function saveInlineEditMeal(id) {
+            const idx = meals.findIndex(m => m.id === id); meals[idx].kcal = parseInt(document.getElementById(`edit-m-kcal-${id}`).value) || 0; meals[idx].protein = parseInt(document.getElementById(`edit-m-prot-${id}`).value) || 0;
+            localStorage.setItem('gymMeals', JSON.stringify(meals)); updateUI();
+        }
+
+        function deleteWorkout(id) { if (confirm('Workout löschen?')) { workouts = workouts.filter(w => w.id !== id); localStorage.setItem('gymWorkouts', JSON.stringify(workouts)); updateUI(); } }
+        function deleteMeal(id) { if (confirm('Eintrag löschen?')) { meals = meals.filter(m => m.id !== id); localStorage.setItem('gymMeals', JSON.stringify(meals)); updateUI(); } }
+
+        function updateWorkoutList() {
+            const list = document.getElementById('workoutList'); if (workouts.length === 0) { list.innerHTML = `<div class="empty-state"><p>Keine Workouts eingetragen.</p></div>`; return; }
+            const sorted = [...workouts].sort((a, b) => new Date(b.date) - new Date(a.date)); const prs = {}; workouts.forEach(w => { if (!prs[w.exercise] || w.weight > prs[w.exercise]) prs[w.exercise] = w.weight; });
+            list.innerHTML = sorted.map(w => `
+                <div class="workout-item" id="workout-item-${w.id}">
+                    <div class="workout-info">
+                        <div class="workout-title">${w.exercise} ${w.weight === prs[w.exercise] ? '<span class="pr-badge">PR!</span>' : ''}</div>
+                        <div class="workout-details">${w.weight}kg × ${w.reps} Wdh × ${w.sets} Sätze = ${w.volume}kg<br>📅 ${new Date(w.date).toLocaleDateString('de-DE')}</div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="action-btn share" onclick="shareDayPDF('${w.date}')">📄 PDF</button>
+                        <button class="action-btn edit" onclick="enableInlineEditWorkout(${w.id})">✏️</button>
+                        <button class="action-btn delete" onclick="deleteWorkout(${w.id})">🗑️</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function updateMacrosUI() {
+            const selectedDate = document.getElementById('macroDate').value; const todaysMeals = meals.filter(m => m.date === selectedDate);
+            const totalKcal = todaysMeals.reduce((sum, m) => sum + m.kcal, 0); const totalProtein = todaysMeals.reduce((sum, m) => sum + m.protein, 0);
+            document.getElementById('kcalProgressLabel').textContent = `${totalKcal} / ${macroGoals.kcal} kcal`; document.getElementById('proteinProgressLabel').textContent = `${totalProtein} / ${macroGoals.protein} g`;
+            const kcalPct = Math.min((totalKcal / macroGoals.kcal) * 100, 100); const proteinPct = Math.min((totalProtein / macroGoals.protein) * 100, 100);
+            document.getElementById('kcalBar').style.width = `${kcalPct}%`; document.getElementById('proteinBar').style.width = `${proteinPct}%`;
+            const list = document.getElementById('macroList'); if (todaysMeals.length === 0) { list.innerHTML = `<div class="empty-state"><p>Keine Einträge für dieses Datum.</p></div>`; return; }
+            list.innerHTML = todaysMeals.map(m => `
+                <div class="macro-item" id="macro-item-${m.id}">
+                    <div class="workout-info">
+                        <div class="workout-title">${m.name}</div>
+                        <div class="workout-details">🔥 ${m.kcal} kcal | 🧬 ${m.protein}g Protein</div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="action-btn edit" onclick="enableInlineEditMeal(${m.id})">✏️</button>
+                        <button class="action-btn delete" onclick="deleteMeal(${m.id})">🗑️</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        document.getElementById('macroDate').addEventListener('change', updateMacrosUI);
+
+        function updateUI() { updateStats(); updateWorkoutList(); updateMacrosUI(); checkAchievements(); updateChart(); }
+
+        function calculateStreaks() {
+            if (workouts.length === 0) return { current: 0, max: 0, warning: false }; const dates = [...new Set(workouts.map(w => w.date))].sort();
+            let maxStreak = 0, tempStreak = 0, lastDate = null;
+            dates.forEach(dateStr => {
+                const currentDate = new Date(dateStr);
+                if (!lastDate) { tempStreak = 1; } else {
+                    const diffDays = Math.ceil(Math.abs(currentDate - lastDate) / (1000 * 60 * 60 * 24));
+                    if (diffDays === 1) { tempStreak++; } else if (diffDays > 1) { if (tempStreak > maxStreak) maxStreak = tempStreak; tempStreak = 1; }
+                } lastDate = currentDate;
+            }); if (tempStreak > maxStreak) maxStreak = tempStreak;
+            let currentStreak = 0; const lastTrainingStr = dates[dates.length - 1]; const diffFromToday = Math.floor(Math.abs(new Date(todayStr) - new Date(lastTrainingStr)) / (1000 * 60 * 60 * 24));
+            if (diffFromToday <= 1) currentStreak = tempStreak;
+            return { current: currentStreak, max: Math.max(maxStreak, currentStreak), warning: (diffFromToday === 1 && lastTrainingStr !== todayStr) };
+        }
+
+        function updateStats() {
+            document.getElementById('totalWorkouts').textContent = workouts.length;
+            document.getElementById('totalVolume').textContent = Math.round(workouts.reduce((sum, w) => sum + w.volume, 0)).toLocaleString() + ' kg';
+            const streakData = calculateStreaks(); document.getElementById('currentStreak').textContent = `🔥 ${streakData.current} Tage`;
+            document.getElementById('maxStreak').textContent = `👑 ${streakData.max} Tage`; document.getElementById('streakWarning').style.display = streakData.warning ? 'block' : 'none';
+        }
+
+        function checkAchievements() {
+            document.getElementById('ach-100kg').classList.toggle('unlocked', workouts.some(w => w.exercise === 'Bankdrücken' && w.weight >= 100));
+            document.getElementById('ach-10workouts').classList.toggle('unlocked', new Set(workouts.map(w => w.date)).size >= 10);
+            let maxWeeklyVol = 0; const volumeByWeek = {};
+            workouts.forEach(w => {
+                const d = new Date(w.date); const oneJan = new Date(d.getFullYear(),0,1);
+                const weekNum = Math.ceil((d.getDay() + 1 + Math.floor((d - oneJan) / (24 * 60 * 60 * 1000))) / 7); const key = `${d.getFullYear()}-W${weekNum}`;
+                volumeByWeek[key] = (volumeByWeek[key] || 0) + w.volume; if (volumeByWeek[key] > maxWeeklyVol) maxWeeklyVol = volumeByWeek[key];
+            });
+            const volCard = document.getElementById('ach-vol-tier'); const volIcon = document.getElementById('ach-vol-icon');
+            const volBadge = document.getElementById('ach-vol-badge'); const volTitle = document.getElementById('ach-vol-title'); const volDesc = document.getElementById('ach-vol-desc');
+            volCard.classList.remove('unlocked', 'bronze', 'silber', 'gold');
+            if (maxWeeklyVol >= 20000) { volCard.classList.add('unlocked', 'gold'); volIcon.textContent = '🥇'; volBadge.textContent = 'Gold'; volTitle.textContent = 'Titan'; volDesc.textContent = `${Math.round(maxWeeklyVol).toLocaleString()}kg geschafft.`; }
+            else if (maxWeeklyVol >= 10000) { volCard.classList.add('unlocked', 'silber'); volIcon.textContent = '🥈'; volBadge.textContent = 'Silber'; volTitle.textContent = 'Eisengott'; volDesc.textContent = `10.000kg+ geschafft.`; }
+            else if (maxWeeklyVol >= 5000) { volCard.classList.add('unlocked', 'bronze'); volIcon.textContent = '🥉'; volBadge.textContent = 'Bronze'; volTitle.textContent = 'Eisen-Anwärter'; volDesc.textContent = `5.000kg+ geschafft.`; }
+            else { volIcon.textContent = '🥉'; volBadge.textContent = 'Bronze'; volTitle.textContent = 'Eisen-Anwärter'; volDesc.textContent = `Sammle 5.000kg Wochenvolumen.`; }
+        }
+
+        function shareDayPDF(dateString) {
+            const targetDateFormatted = new Date(dateString).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+            const dayWorkouts = workouts.filter(w => w.date === dateString); const dayMeals = meals.filter(m => m.date === dateString);
+            let printHTML = `<div class="print-title">Gym Tracker Report</div><div style="margin-bottom:30px;">Report für: <strong>${targetDateFormatted}</strong></div>
+                <div class="print-section"><h3>🏋️ Übungen</h3>${dayWorkouts.map(w => `<div class="print-item"><strong>${w.exercise}</strong>: ${w.weight}kg × ${w.reps} × ${w.sets}</div>`).join('')}</div>
+                <div class="print-section"><h3>🥗 Ernährung</h3>${dayMeals.map(m => `<div class="print-item"><strong>${m.name}</strong>: ${m.kcal} kcal | ${m.protein}g P</div>`).join('')}</div>`;
+            document.getElementById('print-share-area').innerHTML = printHTML; window.print();
+        }
+
+        function openExportModal() { if(workouts.length === 0) return; document.getElementById('exportModal').classList.add('open'); }
+        function closeExportModal() { document.getElementById('exportModal').classList.remove('open'); }
+
+        function processCSVExport() {
+            const configExport = { date: document.getElementById('col-date').checked, exercise: document.getElementById('col-exercise').checked, weight: document.getElementById('col-weight').checked, reps: document.getElementById('col-reps').checked, sets: document.getElementById('col-sets').checked, volume: document.getElementById('col-volume').checked };
+            let headers = []; if (configExport.date) headers.push('Datum'); if (configExport.exercise) headers.push('Übung'); if (configExport.weight) headers.push('Gewicht'); if (configExport.reps) headers.push('Reps'); if (configExport.sets) headers.push('Sätze'); if (configExport.volume) headers.push('Volumen');
+            let csv = headers.join(',') + '\n';
+            workouts.forEach(w => { let row = []; if (configExport.date) row.push(w.date); if (configExport.exercise) row.push(w.exercise); if (configExport.weight) row.push(w.weight); if (configExport.reps) row.push(w.reps); if (configExport.sets) row.push(w.sets); if (configExport.volume) row.push(w.volume); csv += row.join(',') + '\n'; });
+            const blob = new Blob([csv], { type: 'text/csv;' }); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'gym-export.csv'; a.click(); closeExportModal();
+        }
+
+        function switchChart(type) { currentChartType = type; document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active')); if (event) event.target.classList.add('active'); updateChart(); }
+
+        function updateChart() {
+            const canvas = document.getElementById('progressChart'); const ctx = canvas.getContext('2d'); if (currentChart) currentChart.destroy(); if (workouts.length === 0) return;
+            const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const gridColor = isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(203, 213, 224, 0.5)'; const textColor = isDark ? '#94a3b8' : '#4a5568';
+            if (currentChartType === 'weight') {
+                const exerciseData = {}; workouts.forEach(w => { if (!exerciseData[w.exercise]) exerciseData[w.exercise] = []; exerciseData[w.exercise].push({ date: w.date, weight: w.weight }); });
+                const allDates = [...new Set(workouts.map(w => w.date))].sort(); const colors = ['#38bdf8', '#4ade80', '#fb923c', '#a78bfa', '#f87171'];
+                const datasets = Object.keys(exerciseData).map((ex, i) => ({ label: ex, data: allDates.map(d => { const found = exerciseData[ex].find(w => w.date === d); return found ? found.weight : null; }), borderColor: colors[i % colors.length], backgroundColor: 'transparent', tension: 0.2, spanGaps: true }));
+                currentChart = new Chart(ctx, { type: 'line', data: { labels: allDates.map(d => new Date(d).toLocaleDateString('de-DE', {day:'2-digit', month:'short'})), datasets }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: textColor } } }, scales: { y: { grid: { color: gridColor }, ticks: { color: textColor } }, x: { grid: { display: false }, ticks: { color: textColor } } } } });
+            } else if (currentChartType === 'frequency') {
+                const freq = {}; workouts.forEach(w => freq[w.exercise] = (freq[w.exercise] || 0) + 1);
+                currentChart = new Chart(ctx, { type: 'bar', data: { labels: Object.keys(freq), datasets: [{ data: Object.values(freq), backgroundColor: '#3182ce' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: gridColor }, ticks: { color: textColor } }, x: { grid: { display: false }, ticks: { color: textColor } } } } });
+            } else if (currentChartType === 'correlation' && config.calories) {
+                const volumeByDate = {}; workouts.forEach(w => volumeByDate[w.date] = (volumeByDate[w.date] || 0) + w.volume); const allDates = Object.keys(volumeByDate).sort();
+                const backgroundColors = allDates.map(date => { const dayKcal = meals.filter(m => m.date === date).reduce((sum, m) => sum + m.kcal, 0); return dayKcal >= macroGoals.kcal ? '#4ade80' : '#38bdf8'; });
+                currentChart = new Chart(ctx, { type: 'bar', data: { labels: allDates.map(d => new Date(d).toLocaleDateString('de-DE', {day:'2-digit', month:'short'})), datasets: [{ label: 'Volumen', data: allDates.map(d => volumeByDate[d]), backgroundColor: backgroundColors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: textColor } } }, scales: { y: { grid: { color: gridColor }, ticks: { color: textColor } }, x: { grid: { display: false }, ticks: { color: textColor } } } } });
+            }
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => updateChart());
+    </script>
+</body>
+</html>
